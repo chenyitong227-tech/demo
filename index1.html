@@ -1,0 +1,824 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>小林的假期月历</title>
+  <style>
+    :root {
+      --bg: #FFF8F0;
+      --card: #FFFFFF;
+      --text: #1F2937;
+      --soft: #6B7280;
+      --mute: #9CA3AF;
+      --border: #F1E9DC;
+      --primary: #F97316;
+      --primary-soft: #FFEDD5;
+      --weekend: #FFF7ED;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.5 -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", Helvetica, sans-serif;
+    }
+    .page {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 28px 24px 80px;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .titlebar {
+      display: flex;
+      align-items: baseline;
+      gap: 18px;
+    }
+    .title {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    .subtitle {
+      color: var(--soft);
+      font-size: 14px;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    button, .pill {
+      border: none;
+      background: var(--card);
+      color: var(--text);
+      padding: 8px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-size: 13px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    button.primary {
+      background: var(--primary);
+      color: #fff;
+    }
+    button.ghost {
+      background: transparent;
+      border: 1px solid var(--primary);
+      color: var(--primary);
+    }
+    button:hover { transform: translateY(-1px); transition: transform .1s ease; }
+
+    .month-pager {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .month-label {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--primary);
+      background: var(--primary-soft);
+      padding: 6px 14px;
+      border-radius: 999px;
+    }
+
+    .weekhead {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 8px;
+      margin-bottom: 8px;
+      color: var(--soft);
+      font-size: 13px;
+      text-align: center;
+    }
+    .weekhead div.weekend { color: var(--primary); font-weight: 600; }
+
+    .calendar {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 8px;
+    }
+    .cell {
+      min-height: 130px;
+      background: var(--card);
+      border-radius: 14px;
+      padding: 8px 8px 10px;
+      box-shadow: 0 4px 12px rgba(31,41,55,0.05);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      position: relative;
+    }
+    .cell.weekend { background: var(--weekend); }
+    .cell.outside { opacity: 0.35; }
+    .cell.today { outline: 2px solid var(--primary); }
+    .daynum {
+      font-size: 13px;
+      color: var(--mute);
+      display: flex;
+      justify-content: space-between;
+    }
+    .daynum .num { font-weight: 700; color: var(--text); }
+    .event {
+      background: #FFF;
+      border-left: 4px solid var(--primary);
+      border-radius: 8px;
+      padding: 6px 8px;
+      font-size: 12px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+      position: relative;
+    }
+    .event .time { color: var(--primary); font-weight: 700; font-size: 11px; }
+    .event .name { font-weight: 600; }
+    .event .info { color: var(--soft); font-size: 11px; margin-top: 2px; }
+
+    .event.conflict {
+      background: #FEF2F2;
+      border-left-color: #DC2626 !important;
+      box-shadow: 0 0 0 2px #FCA5A5 inset;
+    }
+    .event.conflict::after {
+      content: '⚠ 冲突';
+      position: absolute;
+      top: -8px;
+      right: 6px;
+      background: #DC2626;
+      color: #fff;
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 999px;
+      font-weight: 700;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+    .cell.has-conflict { outline: 2px dashed #DC2626; }
+
+    .conflict-banner {
+      margin-bottom: 16px;
+      padding: 12px 16px;
+      border-radius: 12px;
+      background: #FEF2F2;
+      color: #B91C1C;
+      border: 1px solid #FCA5A5;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+    .conflict-banner.empty { display: none; }
+    .conflict-banner h4 { margin: 0 0 4px; font-size: 14px; }
+
+    .empty {
+      padding: 60px 20px;
+      text-align: center;
+      color: var(--mute);
+    }
+
+    .event { cursor: pointer; transition: transform .1s ease, box-shadow .1s ease; }
+    .event:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0,0,0,.08); }
+
+    /* ===== Modal ===== */
+    .mask {
+      position: fixed; inset: 0; background: rgba(15,23,42,0.45);
+      display: none; align-items: center; justify-content: center; z-index: 9999;
+    }
+    .mask.show { display: flex; }
+    .modal {
+      background: #fff; width: min(420px, 92vw); border-radius: 16px; padding: 20px 22px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.25);
+    }
+    .modal h3 { margin: 0 0 14px; font-size: 18px; }
+    .field { margin-bottom: 12px; }
+    .field label { display:block; font-size: 12px; color: var(--soft); margin-bottom: 4px; }
+    .field input, .field select {
+      width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid #E5E7EB; font-size: 14px;
+      background: #FAFAFA;
+    }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+    .swatch {
+      width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
+      border: 2px solid #fff; box-shadow: 0 0 0 1px #E5E7EB;
+    }
+    .swatch.active { box-shadow: 0 0 0 2px var(--primary); }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+
+    @media print {
+      @page { size: A4 landscape; margin: 12mm; }
+      body { background: #fff; }
+      .toolbar .actions { display: none; }
+      .cell { box-shadow: none; border: 1px solid #ECECEC; }
+      .page { max-width: none; padding: 0; }
+      .title { font-size: 20px; }
+      .month-label { background: transparent; padding: 0; }
+      .cell { min-height: 100px; }
+      .mask { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="toolbar">
+      <div class="titlebar">
+        <div class="title" id="childTitle">小林的假期月历</div>
+        <div class="subtitle">点击右上「打印 / 导出 PDF」即可保存或打印</div>
+      </div>
+      <div class="actions">
+        <div class="month-pager">
+          <button id="prevBtn">‹ 上月</button>
+          <span class="month-label" id="monthLabel">2026 年 6 月</span>
+          <button id="nextBtn">下月 ›</button>
+        </div>
+        <button class="ghost" id="todayBtn">今天</button>
+        <button class="primary" id="addBtn">+ 添加日程</button>
+        <button class="primary" onclick="window.print()">打印 / 导出 PDF</button>
+        <button class="ghost" id="exportBtn" title="导出你所有的增删改为 JSON 文件">导出 JSON</button>
+        <button class="ghost" id="importBtn" title="导入 JSON 覆盖当前修改">导入 JSON</button>
+        <input type="file" id="importInput" accept="application/json,.json" style="display:none" />
+        <button class="ghost" id="resetBtn" title="清空所有自定义增删，恢复默认排课">重置自定义</button>
+      </div>
+    </div>
+
+    <!-- Modal: 添加 / 编辑 -->
+    <div class="mask" id="modalMask">
+      <div class="modal">
+        <h3 id="modalTitle">添加日程</h3>
+        <div class="field">
+          <label>名称</label>
+          <input id="f_title" placeholder="例如：钢琴课" />
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>日期</label>
+            <input id="f_date" type="date" />
+          </div>
+          <div class="field">
+            <label>地点（可选）</label>
+            <input id="f_location" placeholder="例如：宝地广场" />
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>开始时间</label>
+            <input id="f_start" type="time" />
+          </div>
+          <div class="field">
+            <label>结束时间</label>
+            <input id="f_end" type="time" />
+          </div>
+        </div>
+        <div class="field">
+          <label>颜色</label>
+          <div class="swatches" id="f_colors"></div>
+        </div>
+        <div class="modal-actions">
+          <button class="ghost" id="modalDelete" style="margin-right:auto;display:none;background:#FEE2E2;color:#B91C1C;border:none;">删除</button>
+          <button class="ghost" id="modalCancel">取消</button>
+          <button class="primary" id="modalSave">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="conflict-banner empty" id="conflictBanner"></div>
+    <div class="weekhead" id="weekhead"></div>
+    <div class="calendar" id="calendar"></div>
+  </div>
+
+  <script>
+    // ============ 本地存储：用户自定义增删 ============
+    const STORE_KEY = 'lin_calendar_store_v1';
+    function loadStore() {
+      try { return JSON.parse(localStorage.getItem(STORE_KEY)) || { custom: [], deleted: [] }; }
+      catch (e) { return { custom: [], deleted: [] }; }
+    }
+    function saveStore(s) { localStorage.setItem(STORE_KEY, JSON.stringify(s)); }
+    let STORE = loadStore();
+    function eventKey(e) { return `${e.date}__${e.start}__${e.end}__${e.title}`; }
+
+    // ============ 事件数据（每次发截图给我，我帮你更新这里） ============
+    // 字段：date 'YYYY-MM-DD', start 'HH:MM', end 'HH:MM', title, location, color
+    function computeEvents() { return (function buildEvents() {
+      const list = [];
+      const pad2 = (n) => String(n).padStart(2, '0');
+      const iso = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+
+      // ============ 永久删除清单（从导出 JSON 沉淀过来的 deleted）============
+      // 这些"默认 BATCHES 会生成、但用户已确认删除"的事件不再出现
+      const EXCLUDE_KEYS = new Set([
+        '2026-06-25__18:30__20:00__斯坦星球常规班',
+        '2026-06-30__09:00__12:00__斯坦星球暑假班（第一期）',
+        '2026-06-29__16:30__18:00__虹口百联魔方课',
+        '2026-06-30__16:40__17:40__乐波弯游泳',
+        '2026-07-09__18:30__20:20__乐读语文 三年级夏季长期班',
+        '2026-07-16__18:30__20:00__斯坦星球常规班',
+        '2026-07-23__18:30__20:00__斯坦星球常规班',
+        '2026-07-15__18:30__20:20__乐读语文 三年级夏季长期班',
+        '2026-07-03__16:30__17:30__宝地轮滑',
+        '2026-07-07__16:40__17:40__乐波弯游泳',
+        '2026-07-14__16:40__17:40__乐波弯游泳',
+        '2026-07-21__16:40__17:40__乐波弯游泳',
+        '2026-07-28__16:40__17:40__乐波弯游泳',
+      ]);
+
+      // ============ 永久添加清单（从导出 JSON 沉淀过来的 custom）============
+      // 这些是"用户手动添加或从默认改过来"的事件，视作默认排课的一部分
+      const HARDCODED_CUSTOM = [
+        { title: '眼底照片+OCT检查',              date: '2026-06-24', start: '14:00', end: '15:00', location: '新华医院',   color: '#A7F3D0' },
+        { title: '游泳',                          date: '2026-06-23', start: '14:50', end: '15:50', location: '乐波湾',     color: '#FCD34D' },
+        { title: '跟爸爸妈妈一起玩',              date: '2026-06-26', start: '08:00', end: '20:00', location: '乐高乐园',   color: '#DBEAFE' },
+        { title: '斯坦星球常规班',                date: '2026-06-25', start: '16:30', end: '18:00', location: '',           color: '#67E8F9' },
+        { title: '英语期末考试',                  date: '2026-06-23', start: '08:00', end: '10:00', location: '上实小学部', color: '#FCD34D' },
+        { title: '返校',                          date: '2026-06-24', start: '08:00', end: '11:00', location: '上实小学部', color: '#FCD34D' },
+        { title: '期末学生质量分析',              date: '2026-06-25', start: '08:00', end: '11:00', location: '上实小学部', color: '#FCD34D' },
+        { title: '结业式',                        date: '2026-06-30', start: '08:00', end: '11:00', location: '上实小学部', color: '#FCD34D' },
+        { title: '语文数学期末考试',              date: '2026-06-22', start: '08:00', end: '11:20', location: '上实小学部', color: '#FCD34D' },
+        { title: '斯坦星球暑假班（第一期）',      date: '2026-06-30', start: '16:30', end: '19:30', location: '',           color: '#93C5FD' },
+        { title: '乐读语文 三年级夏季长期班',     date: '2026-07-09', start: '13:30', end: '15:20', location: '',           color: '#C4B5FD' },
+        { title: '斯坦星球常规班',                date: '2026-07-23', start: '16:45', end: '18:15', location: '',           color: '#67E8F9' },
+        { title: '乐读语文 三年级夏季长期班',     date: '2026-07-15', start: '08:20', end: '10:10', location: '',           color: '#C4B5FD' },
+        { title: '斯坦星球常规班（需调课）',      date: '2026-07-15', start: '18:30', end: '20:00', location: '',           color: '#67E8F9' },
+        { title: 'PU英语课',                      date: '2026-07-03', start: '17:00', end: '19:00', location: '',           color: '#FCD34D' },
+        { title: '学乐绘本精讲',                  date: '2026-07-27', start: '09:30', end: '12:00', location: '',           color: '#FCD34D' },
+        { title: '学乐绘本精讲',                  date: '2026-07-30', start: '09:30', end: '12:00', location: '',           color: '#FCD34D' },
+        { title: '学乐绘本精讲',                  date: '2026-07-31', start: '09:30', end: '12:00', location: '',           color: '#FCD34D' },
+        { title: '测试',                          date: '2026-07-10', start: '13:30', end: '15:00', location: '中科超长',   color: '#FCD34D' },
+        { title: '乐波弯游泳',                    date: '2026-07-07', start: '16:00', end: '17:00', location: '',           color: '#A7F3D0' },
+        { title: '乐波湾游泳',                    date: '2026-07-14', start: '16:00', end: '17:00', location: '',           color: '#FCD34D' },
+        { title: '乐波弯游泳',                    date: '2026-07-21', start: '16:00', end: '17:00', location: '',           color: '#A7F3D0' },
+        { title: '乐波弯游泳',                    date: '2026-07-28', start: '16:00', end: '17:00', location: '',           color: '#A7F3D0' },
+      ];
+
+      // 批次定义：可以一直往下加，每条独立
+      const BATCHES = [
+        // 1) 每周六、周日的两节课（6/27 - 7/26）
+        {
+          dateRanges: [['2026-06-26', '2026-07-26']],
+          weekdays: [6, 0], // 0=周日, 6=周六
+          templates: [
+            { start: '08:30', end: '11:00', title: '科学思维 MC-B 三年级暑期', location: '隆昌路 104 教室（隆昌路地铁站旁）', color: '#FCD34D' },
+            { start: '18:30', end: '20:30', title: '英语国际 4S 四年级暑期',   location: '宝地广场 D 座 3 楼 312 教室',           color: '#FDBA74' },
+          ],
+        },
+        // 2) 斯坦星球暑假班 第一期：6/29-7/3、7/6-7/10 每天 9:00-12:00（共 10 天）
+        {
+          dateRanges: [['2026-06-29', '2026-07-03'], ['2026-07-06', '2026-07-10']],
+          weekdays: [1, 2, 3, 4, 5], // 周一到周五
+          templates: [
+            { start: '09:00', end: '12:00', title: '斯坦星球暑假班（第一期）', location: '', color: '#93C5FD' },
+          ],
+        },
+        // 3) 科学思维 三年级暑期 S：7/16-7/29 工作日 18:30-20:30
+        {
+          dateRanges: [['2026-07-16', '2026-07-29']],
+          weekdays: [1, 2, 3, 4, 5],
+          templates: [
+            { start: '18:30', end: '20:30', title: '科学思维 三年级暑期 S', location: '昆明路 555 号宝地广场 D 座 3 楼 310 教室', color: '#86EFAC' },
+          ],
+        },
+        // 4a) 乐读语文 三年级夏季长期班：7/6-7/15 工作日 18:30-20:20（原时间）
+        {
+          dateRanges: [['2026-07-06', '2026-07-15']],
+          weekdays: [1, 2, 3, 4, 5],
+          templates: [
+            { start: '18:30', end: '20:20', title: '乐读语文 三年级夏季长期班', location: '', color: '#C4B5FD' },
+          ],
+        },
+        // 4b) 7/16、7/17 两天调到上午 08:20-10:10
+        {
+          dateRanges: [['2026-07-16', '2026-07-17']],
+          weekdays: [1, 2, 3, 4, 5],
+          templates: [
+            { start: '08:20', end: '10:10', title: '乐读语文 三年级夏季长期班（已调课）', location: '', color: '#C4B5FD' },
+          ],
+        },
+        // 5) 乐读语文 二年级春季长期班 收尾两次课（已调课至周三）：6/24、7/1 周三 18:30-20:05
+        {
+          dateRanges: [['2026-06-24', '2026-06-24'], ['2026-07-01', '2026-07-01']],
+          weekdays: [0, 1, 2, 3, 4, 5, 6],
+          templates: [
+            { start: '18:30', end: '20:05', title: '乐读语文 二年级春季长期班（已调课）', location: '', color: '#F9A8D4' },
+          ],
+        },
+        // 6) 斯坦星球常规班：每周四 18:30-20:00
+        {
+          dateRanges: [['2026-06-18', '2026-08-31']],
+          weekdays: [4],
+          templates: [
+            { start: '18:30', end: '20:00', title: '斯坦星球常规班', location: '', color: '#67E8F9' },
+          ],
+        },
+        // 7) 乐读语文 三年级夏季长期班 收心复习课：8/1 周六 18:30-20:20
+        {
+          dateRanges: [['2026-08-01', '2026-08-01']],
+          weekdays: [0, 1, 2, 3, 4, 5, 6],
+          templates: [
+            { start: '18:30', end: '20:20', title: '乐读语文 三年级夏季长期班 第12讲 收心复习课', location: '', color: '#C4B5FD' },
+          ],
+        },
+        // 8) 乐波弯游泳常规班：每周二 16:40-17:40（6/30 起）
+        {
+          dateRanges: [['2026-06-30', '2026-08-31']],
+          weekdays: [2],
+          templates: [
+            { start: '16:40', end: '17:40', title: '乐波弯游泳', location: '', color: '#A7F3D0' },
+          ],
+        },
+        // 9) 宝地轮滑常规班：每周五 16:30-17:30（6/30 起，第一节 7/3）
+        {
+          dateRanges: [['2026-06-30', '2026-08-31']],
+          weekdays: [5],
+          templates: [
+            { start: '16:30', end: '17:30', title: '宝地轮滑', location: '', color: '#FBCFE8' },
+          ],
+        },
+        // 10) 赵汝飞写字：每周三 15:40-17:10（6/30 起，第一节 7/1）
+        {
+          dateRanges: [['2026-06-30', '2026-08-31']],
+          weekdays: [3],
+          templates: [
+            { start: '15:40', end: '17:10', title: '赵汝飞写字', location: '', color: '#FCA5A5' },
+          ],
+        },
+        // 12) 学乐英语：每周日 13:00-15:30
+        {
+          dateRanges: [['2026-06-28', '2026-08-31']],
+          weekdays: [0],
+          templates: [
+            { start: '13:00', end: '15:30', title: '学乐英语', location: '', color: '#FED7AA' },
+          ],
+        },
+      ];
+
+      BATCHES.forEach((batch) => {
+        batch.dateRanges.forEach(([s, e]) => {
+          const start = new Date(s);
+          const end = new Date(e);
+          for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+            if (batch.weekdays.includes(d.getDay())) {
+              const day = iso(d);
+              batch.templates.forEach((t) => {
+                const k = `${day}__${t.start}__${t.end}__${t.title}`;
+                if (EXCLUDE_KEYS.has(k)) return;
+                list.push({ date: day, ...t });
+              });
+            }
+          }
+        });
+      });
+
+      // 追加已沉淀的自定义事件
+      HARDCODED_CUSTOM.forEach((e) => list.push({ ...e }));
+
+      // 再叠加用户在浏览器里当前的增删（localStorage）
+      const deletedSet = new Set(STORE.deleted || []);
+      const merged = list.filter((e) => !deletedSet.has(eventKey(e)));
+      (STORE.custom || []).forEach((e) => merged.push({ ...e }));
+
+      // 去重：相同 date + start + end + title 只保留第一条（防止 hardcoded 与 localStorage 撞车）
+      const seen = new Set();
+      const deduped = [];
+      merged.forEach((e) => {
+        const k = eventKey(e);
+        if (seen.has(k)) return;
+        seen.add(k);
+        deduped.push(e);
+      });
+      return deduped;
+    })(); }
+    let EVENTS = computeEvents();
+
+    // 周一开始
+    const WEEK_HEAD = ['一', '二', '三', '四', '五', '六', '日'];
+    const state = { year: 2026, month: 6 };
+
+    // 把 Date.getDay()(周日=0) 映射到「周一起始的列索引」(周一=0, 周日=6)
+    function colIndex(d) { return (d.getDay() + 6) % 7; }
+
+    const $cal = document.getElementById('calendar');
+    const $wh = document.getElementById('weekhead');
+    const $label = document.getElementById('monthLabel');
+
+    function renderHead() {
+      $wh.innerHTML = WEEK_HEAD
+        .map((w, i) => `<div class="${i >= 5 ? 'weekend' : ''}">${w}</div>`)
+        .join('');
+    }
+
+    function pad(n) { return String(n).padStart(2, '0'); }
+
+    function render() {
+      $label.textContent = `${state.year} 年 ${state.month} 月`;
+      const first = new Date(state.year, state.month - 1, 1);
+      const firstWeekday = colIndex(first); // 周一=0, 周日=6
+      const daysInMonth = new Date(state.year, state.month, 0).getDate();
+      const prevMonthDays = new Date(state.year, state.month - 1, 0).getDate();
+      const totalCells = Math.ceil((firstWeekday + daysInMonth) / 7) * 7;
+
+      // 事件按日期分组 + 冲突检测
+      const toMin = (hhmm) => {
+        const [h, m] = hhmm.split(':').map(Number);
+        return h * 60 + m;
+      };
+      const byDate = {};
+      EVENTS.forEach((e) => {
+        const item = { ...e, _s: toMin(e.start), _e: toMin(e.end), conflict: false };
+        (byDate[e.date] = byDate[e.date] || []).push(item);
+      });
+      const conflictDates = [];
+      Object.entries(byDate).forEach(([date, arr]) => {
+        arr.sort((a, b) => a._s - b._s);
+        let hasConflictHere = false;
+        for (let i = 0; i < arr.length; i++) {
+          for (let j = i + 1; j < arr.length; j++) {
+            if (arr[i]._s < arr[j]._e && arr[i]._e > arr[j]._s) {
+              arr[i].conflict = true;
+              arr[j].conflict = true;
+              hasConflictHere = true;
+            }
+          }
+        }
+        if (hasConflictHere) conflictDates.push({ date, items: arr.filter((x) => x.conflict) });
+      });
+
+      // 冲突横幅（仅显示当前月内的冲突）
+      const banner = document.getElementById('conflictBanner');
+      const thisMonthConflicts = conflictDates.filter(({ date }) => {
+        const [y, m] = date.split('-').map(Number);
+        return y === state.year && m === state.month;
+      });
+      if (thisMonthConflicts.length) {
+        const html = thisMonthConflicts
+          .map(({ date, items }) => {
+            const titles = items.map((it) => `${it.start}-${it.end} ${it.title}`).join(' ｜ ');
+            return `<div>📅 <b>${date}</b>：${titles}</div>`;
+          })
+          .join('');
+        banner.classList.remove('empty');
+        banner.innerHTML = `<h4>⚠ 本月有 ${thisMonthConflicts.length} 天存在时间冲突</h4>${html}`;
+      } else {
+        banner.classList.add('empty');
+        banner.innerHTML = '';
+      }
+
+      const todayStr = new Date().toISOString().slice(0, 10);
+
+      const cells = [];
+      for (let i = 0; i < totalCells; i++) {
+        const offset = i - firstWeekday + 1;
+        let cellDate, isOutside = false, num;
+        if (offset < 1) {
+          isOutside = true;
+          num = prevMonthDays + offset;
+          cellDate = new Date(state.year, state.month - 2, num);
+        } else if (offset > daysInMonth) {
+          isOutside = true;
+          num = offset - daysInMonth;
+          cellDate = new Date(state.year, state.month, num);
+        } else {
+          num = offset;
+          cellDate = new Date(state.year, state.month - 1, num);
+        }
+        const iso = `${cellDate.getFullYear()}-${pad(cellDate.getMonth() + 1)}-${pad(cellDate.getDate())}`;
+        const dayOfWeek = cellDate.getDay(); // 0=周日
+        const classes = ['cell'];
+        if (dayOfWeek === 0 || dayOfWeek === 6) classes.push('weekend');
+        if (isOutside) classes.push('outside');
+        if (iso === todayStr) classes.push('today');
+
+        const events = byDate[iso] || [];
+        const hasConflict = events.some((e) => e.conflict);
+        if (hasConflict) classes.push('has-conflict');
+        const eventsHtml = events
+          .map((e) => {
+            const ek = `${e.date}__${e.start}__${e.end}__${e.title}`;
+            return `
+            <div class="event ${e.conflict ? 'conflict' : ''}" data-key="${ek}" style="border-left-color:${e.color || '#F97316'}">
+              <div class="time">${e.start} – ${e.end}</div>
+              <div class="name">${e.title}</div>
+              ${e.location ? `<div class="info">📍 ${e.location}</div>` : ''}
+              ${e.teacher ? `<div class="info">👩‍🏫 ${e.teacher}</div>` : ''}
+              ${e.note ? `<div class="info">📝 ${e.note}</div>` : ''}
+            </div>
+          `;
+          })
+          .join('');
+
+        cells.push(`
+          <div class="${classes.join(' ')}">
+            <div class="daynum"><span class="num">${num}</span></div>
+            ${eventsHtml}
+          </div>
+        `);
+      }
+      $cal.innerHTML = cells.join('');
+    }
+
+    document.getElementById('prevBtn').onclick = () => {
+      state.month -= 1;
+      if (state.month < 1) { state.month = 12; state.year -= 1; }
+      render();
+    };
+    document.getElementById('nextBtn').onclick = () => {
+      state.month += 1;
+      if (state.month > 12) { state.month = 1; state.year += 1; }
+      render();
+    };
+    document.getElementById('todayBtn').onclick = () => {
+      const d = new Date();
+      state.year = d.getFullYear();
+      state.month = d.getMonth() + 1;
+      render();
+    };
+
+    // ============ 添加 / 编辑 / 删除 日程 ============
+    const SWATCHES = ['#FCA5A5','#FDBA74','#FCD34D','#86EFAC','#67E8F9','#93C5FD','#C4B5FD','#F9A8D4','#A7F3D0','#FBCFE8','#FDE68A','#FEF9C3','#DBEAFE','#FED7AA'];
+    const mask = document.getElementById('modalMask');
+    const modalTitle = document.getElementById('modalTitle');
+    const f_title = document.getElementById('f_title');
+    const f_date = document.getElementById('f_date');
+    const f_location = document.getElementById('f_location');
+    const f_start = document.getElementById('f_start');
+    const f_end = document.getElementById('f_end');
+    const f_colors = document.getElementById('f_colors');
+    const modalDeleteBtn = document.getElementById('modalDelete');
+    let pickedColor = SWATCHES[2];
+    let editingKey = null; // 当前正在编辑的事件 key，null = 新增
+
+    function renderSwatches() {
+      f_colors.innerHTML = SWATCHES
+        .map((c) => `<div class="swatch ${c === pickedColor ? 'active' : ''}" data-color="${c}" style="background:${c}"></div>`)
+        .join('');
+      f_colors.querySelectorAll('.swatch').forEach((el) => {
+        el.onclick = () => { pickedColor = el.dataset.color; renderSwatches(); };
+      });
+    }
+
+    function openAddModal() {
+      editingKey = null;
+      modalTitle.textContent = '添加日程';
+      modalDeleteBtn.style.display = 'none';
+      const d = new Date(state.year, state.month - 1, Math.min(15, new Date(state.year, state.month, 0).getDate()));
+      f_title.value = '';
+      f_location.value = '';
+      f_date.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      f_start.value = '15:00';
+      f_end.value = '16:00';
+      pickedColor = SWATCHES[2];
+      renderSwatches();
+      mask.classList.add('show');
+    }
+
+    function openEditModal(event) {
+      editingKey = `${event.date}__${event.start}__${event.end}__${event.title}`;
+      modalTitle.textContent = '编辑日程';
+      modalDeleteBtn.style.display = 'inline-block';
+      f_title.value = event.title || '';
+      f_location.value = event.location || '';
+      f_date.value = event.date || '';
+      f_start.value = event.start || '';
+      f_end.value = event.end || '';
+      pickedColor = event.color || SWATCHES[2];
+      if (!SWATCHES.includes(pickedColor)) SWATCHES.unshift(pickedColor);
+      renderSwatches();
+      mask.classList.add('show');
+    }
+
+    function closeModal() { mask.classList.remove('show'); }
+
+    document.getElementById('addBtn').onclick = openAddModal;
+    document.getElementById('modalCancel').onclick = closeModal;
+    mask.onclick = (e) => { if (e.target === mask) closeModal(); };
+
+    function deleteByKey(key) {
+      const idxCustom = (STORE.custom || []).findIndex((x) => `${x.date}__${x.start}__${x.end}__${x.title}` === key);
+      if (idxCustom >= 0) {
+        STORE.custom.splice(idxCustom, 1);
+      } else {
+        STORE.deleted = STORE.deleted || [];
+        if (!STORE.deleted.includes(key)) STORE.deleted.push(key);
+      }
+    }
+
+    document.getElementById('modalSave').onclick = () => {
+      const title = (f_title.value || '').trim();
+      if (!title) { alert('请填写名称'); return; }
+      if (!f_date.value) { alert('请选日期'); return; }
+      if (!f_start.value || !f_end.value) { alert('请填写时间'); return; }
+      if (f_end.value <= f_start.value) { alert('结束时间需晚于开始时间'); return; }
+      const newE = {
+        title,
+        date: f_date.value,
+        start: f_start.value,
+        end: f_end.value,
+        location: (f_location.value || '').trim(),
+        color: pickedColor,
+      };
+      STORE.custom = STORE.custom || [];
+      if (editingKey) {
+        // 编辑：先删除老的（自定义 → 直接删；默认 → 标记 deleted），再加新的
+        deleteByKey(editingKey);
+        STORE.custom.push(newE);
+      } else {
+        STORE.custom.push(newE);
+      }
+      saveStore(STORE);
+      EVENTS = computeEvents();
+      const [y, m] = newE.date.split('-').map(Number);
+      state.year = y; state.month = m;
+      editingKey = null;
+      closeModal();
+      render();
+    };
+
+    modalDeleteBtn.onclick = () => {
+      if (!editingKey) return;
+      if (!confirm('删除这条日程？')) return;
+      deleteByKey(editingKey);
+      saveStore(STORE);
+      EVENTS = computeEvents();
+      editingKey = null;
+      closeModal();
+      render();
+    };
+
+    // 点击事件块 → 打开编辑模态框
+    $cal.addEventListener('click', (e) => {
+      const ev = e.target.closest('.event');
+      if (!ev) return;
+      const key = ev.dataset.key;
+      if (!key) return;
+      const found = EVENTS.find((x) => `${x.date}__${x.start}__${x.end}__${x.title}` === key);
+      if (!found) return;
+      openEditModal(found);
+    });
+
+    document.getElementById('resetBtn').onclick = () => {
+      if (!confirm('确定清空所有自定义增删？这会恢复默认排课。')) return;
+      STORE = { custom: [], deleted: [] };
+      saveStore(STORE);
+      EVENTS = computeEvents();
+      render();
+    };
+
+    // ============ 导出 / 导入 JSON ============
+    document.getElementById('exportBtn').onclick = () => {
+      const payload = {
+        exportedAt: new Date().toISOString(),
+        note: '把这份文件发给 Cursor，我可以帮你写回 index.html 的默认数据里。',
+        store: STORE,       // 你手动增删改的部分
+        allEvents: EVENTS,  // 当前月历渲染的完整事件（默认 + 自定义 - 已删除）
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const now = new Date();
+      a.href = url;
+      a.download = `lin-calendar-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    };
+
+    document.getElementById('importBtn').onclick = () => {
+      document.getElementById('importInput').click();
+    };
+    document.getElementById('importInput').onchange = (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const parsed = JSON.parse(reader.result);
+          const s = parsed.store || parsed; // 兼容直接的 store 或包含 store 字段的
+          if (!s || (!Array.isArray(s.custom) && !Array.isArray(s.deleted))) {
+            alert('JSON 结构不对，需要包含 { custom: [...], deleted: [...] }');
+            return;
+          }
+          if (!confirm('确定用这份 JSON 覆盖当前修改？（默认排课不受影响）')) return;
+          STORE = { custom: s.custom || [], deleted: s.deleted || [] };
+          saveStore(STORE);
+          EVENTS = computeEvents();
+          render();
+          alert('已导入');
+        } catch (err) {
+          alert('读取失败：' + err.message);
+        }
+      };
+      reader.readAsText(file);
+      e.target.value = ''; // 允许再次选择同一文件
+    };
+
+    renderHead();
+    render();
+  </script>
+</body>
+</html>
